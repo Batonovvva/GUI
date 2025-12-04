@@ -1,5 +1,4 @@
-﻿import settings
-import math
+﻿import math
 
 def check_collision(flying_ball, chain):
     for i, ball in enumerate(chain):

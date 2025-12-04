@@ -1,5 +1,5 @@
 import pygame
-from logic import settings, spiral
+from logic import spiral, settings
 
 
 class Ball:

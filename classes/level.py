@@ -1,5 +1,5 @@
 ﻿import random
-from logic import settings, spiral
+from logic import spiral, settings
 from classes.ball import Ball
 
 

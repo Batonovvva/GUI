@@ -1,9 +1,8 @@
 from __future__ import annotations
-
-from settings import *
+from logic.settings import *
+from logic.spiral import *
 from classes.ball import Ball
-import spiral
-import settings
+
 
 
 CHAIN_GAP_T = (BALL_DIAMETER + BALL_SPACING) / SPIRAL_TIGHTNESS
@@ -11,7 +10,7 @@ SPIRAL_END_T = (SPIRAL_START_RADIUS - SPIRAL_END_RADIUS) / SPIRAL_TIGHTNESS
 
 def respace_chain(chain, spacing=None, start_t=None):
     if spacing is None:
-        spacing = settings.BALL_DIAMETER + settings.BALL_SPACING
+        spacing = BALL_DIAMETER + BALL_SPACING
 
     if not chain:
         return
@@ -24,7 +23,7 @@ def respace_chain(chain, spacing=None, start_t=None):
 
     t_positions = [start_t]
     for i in range(1, len(chain)):
-        next_t = spiral.find_t_at_distance(t_positions[-1], spacing, forward=True)
+        next_t = find_t_at_distance(t_positions[-1], spacing, forward=True)
         t_positions.append(next_t)
 
     for b, t in zip(chain, t_positions):
@@ -32,7 +31,7 @@ def respace_chain(chain, spacing=None, start_t=None):
         if hasattr(b, "calculate_position"):
             b.pos = b.calculate_position()
         else:
-            b.pos = spiral.get_position(t)
+            b.pos = get_position(t)
 
 
 def add_wave(chain: list[Ball], count: int, skull_freq: float = SKULL_SPAWN_CHANCE, colors: list = BALL_COLORS):

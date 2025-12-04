@@ -1,8 +1,5 @@
 ﻿import sys
-
 import pygame
-from logic import settings
-
 from classes.frog import Frog
 from classes.level import Level
 from classes.ball import Ball
@@ -13,6 +10,11 @@ except Exception:
 from logic.chain import find_match, remove_chain, handle_skull, respace_chain
 from logic.collision import check_collision
 from logic.UI import draw_hud, draw_pause_menu, draw_level_complete, draw_game_over, draw_menu, draw_victory
+from logic.settings import *  # импортируем константы: LIVES, MAX_LEVEL, POINTS_PER_BALL, COMBO_MULTIPLIER, BALL_DIAMETER, BALL_SPACING, BALL_RADIUS, WIDTH, HEIGHT, BLACK
+
+# безопасный helper для значений из settings (если что-то не определено)
+def _get_setting(name: str, default):
+    return globals().get(name, default)
 
 
 class Game:
@@ -24,13 +26,14 @@ class Game:
         self.level_number = 1
         self.level = None
         self.frog = Frog()
+        # либо берем LIVES, либо default 3
         self.score = 0
-        self.lives = settings.LIVES if hasattr(settings, "LIVES") else 3
+        self.lives = _get_setting("LIVES", 3)
 
         self.flying_balls = []
 
         self._debug = False
-        self.max_levels = getattr(settings, "MAX_LEVEL", 5)
+        self.max_levels = _get_setting("MAX_LEVEL", 1)
 
     def start_level(self, level_number=None):
         if level_number is not None:
@@ -96,8 +99,6 @@ class Game:
                             self.level_number = 1
                             self.start_level(self.level_number)
 
-
-
     def update(self, dt):
         if self.state != "playing":
             return
@@ -112,6 +113,7 @@ class Game:
                 pass
 
         for ball in self.flying_balls[:]:
+            # Двигаем летящий шарик — поддерживаем обе реализации
             try:
                 ball.update(dt)
             except AttributeError:
@@ -119,32 +121,35 @@ class Game:
                     ball.pos[0] += ball.dx * ball.speed * dt
                     ball.pos[1] += ball.dy * ball.speed * dt
 
-            if self.level and self.level.chain:
+            # Проверяем столкновение с цепочкой
+            if self.level and getattr(self.level, "chain", None):
                 idx = check_collision(ball, self.level.chain)
             else:
                 idx = None
 
             if idx is not None:
+                # ===== если попали в ЧЕРЕП в цепочке — мгновенный Game Over =====
                 target_stationary = self.level.chain[idx]
                 if getattr(target_stationary, "type", Ball.TYPE_NORMAL) == Ball.TYPE_SKULL:
                     self.state = "game_over"
                     return
 
+                # ===== если летящий шар сам — череп (bomb) =====
                 if getattr(ball, "type", Ball.TYPE_NORMAL) == Ball.TYPE_SKULL:
                     removed = handle_skull(self.level.chain, idx)
-                    self.score += len(removed) * getattr(settings, "POINTS_PER_BALL", 10)
+                    self.score += len(removed) * _get_setting("POINTS_PER_BALL", 10)
                 else:
-                    tmp_t = self.level.chain[idx].t if idx < len(self.level.chain) else (
+                    # Вставляем новый stationary Ball на место столкновения
+                    neighbor_t = self.level.chain[idx].t if idx < len(self.level.chain) else (
                         self.level.chain[-1].t if self.level.chain else 0.0
                     )
-
-                    new_ball = Ball(ball.color, tmp_t, Ball.TYPE_NORMAL)
-
+                    new_t = neighbor_t + 0.01
+                    new_ball = Ball(ball.color, new_t, Ball.TYPE_NORMAL)
                     self.level.chain.insert(idx, new_ball)
 
-                    spacing = settings.BALL_DIAMETER + settings.BALL_SPACING
+                    # Перераспределяем t по цепочке
+                    spacing = _get_setting("BALL_DIAMETER", 32) + _get_setting("BALL_SPACING", 2)
                     outer_t = self.level.chain[0].t if self.level.chain else 0.0
-
                     respace_chain(self.level.chain, spacing=spacing, start_t=outer_t)
 
                     match_indices = find_match(self.level.chain, idx)
@@ -152,14 +157,11 @@ class Game:
                         removed_count = remove_chain(self.level.chain, match_indices)
                         self.score += int(
                             removed_count *
-                            getattr(settings, "POINTS_PER_BALL", 10) *
-                            getattr(settings, "COMBO_MULTIPLIER", 1)
+                            _get_setting("POINTS_PER_BALL", 10) *
+                            _get_setting("COMBO_MULTIPLIER", 1)
                         )
 
-                # 6. Удаляем летящий шар
-                if ball in self.flying_balls:
-                    self.flying_balls.remove(ball)
-
+                # Удаляем летящий шарик (один раз)
                 if ball in self.flying_balls:
                     try:
                         self.flying_balls.remove(ball)
@@ -167,6 +169,7 @@ class Game:
                         pass
                 continue
 
+            # Если шарик улетел за экран — удаляем
             try:
                 if hasattr(ball, "is_offscreen") and ball.is_offscreen():
                     if ball in self.flying_balls:
@@ -175,28 +178,29 @@ class Game:
             except Exception:
                 if hasattr(ball, "pos"):
                     bx, by = ball.pos[0], ball.pos[1]
-                    if bx < -settings.BALL_RADIUS or bx > settings.WIDTH + settings.BALL_RADIUS or by < -settings.BALL_RADIUS or by > settings.HEIGHT + settings.BALL_RADIUS:
+                    if bx < -_get_setting("BALL_RADIUS", 16) or bx > _get_setting("WIDTH", 800) + _get_setting("BALL_RADIUS", 16) \
+                       or by < -_get_setting("BALL_RADIUS", 16) or by > _get_setting("HEIGHT", 600) + _get_setting("BALL_RADIUS", 16):
                         if ball in self.flying_balls:
                             self.flying_balls.remove(ball)
                         continue
 
-        for stationary in self.level.chain:
-            try:
-                if stationary.is_at_end():
-                    if getattr(stationary, "type", Ball.TYPE_NORMAL) == Ball.TYPE_SKULL:
-                        self.state = "game_over"
-                        return
-                    if hasattr(self, "lives"):
+        # Проверка: достигла ли цепочка центра (и есть ли череп среди достигших)
+        if self.level and getattr(self.level, "chain", None):
+            for stationary in list(self.level.chain):
+                try:
+                    if stationary.is_at_end():
+                        if getattr(stationary, "type", Ball.TYPE_NORMAL) == Ball.TYPE_SKULL:
+                            self.state = "game_over"
+                            return
+                        # Обычный шарик — уменьшаем жизни или game over
                         self.lives -= 1
                         if self.lives <= 0:
                             self.state = "game_over"
                             return
-                    else:
-                        self.state = "game_over"
-                        return
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
+        # Проверка завершения уровня (таймер/очки)
         if self.level and self.level.is_complete(self.score):
             if self.score >= getattr(self.level, "target_score", 0):
                 self.state = "level_complete"
@@ -204,13 +208,12 @@ class Game:
                 self.state = "game_over"
 
     def draw(self, screen):
-        screen.fill(settings.BLACK)
+        screen.fill(_get_setting("BLACK", (0, 0, 0)))
 
         if self.state == "menu":
-                draw_menu(screen)
+            draw_menu(screen)
 
-
-        elif self.state == "playing" or self.state == "paused":
+        elif self.state in ("playing", "paused"):
             if self.level:
                 for b in self.level.chain:
                     try:
@@ -230,8 +233,7 @@ class Game:
             except Exception:
                 pass
 
-            # HUD
-            next_color = getattr(self.frog, "next_ball_color", getattr(self.frog, "current_ball_color", (255,255,255)))
+            next_color = getattr(self.frog, "next_ball_color", getattr(self.frog, "current_ball_color", (255, 255, 255)))
             draw_hud(screen, self.score, getattr(self.level, "time_remaining", 0), self.level_number, next_color)
 
             if self.state == "paused":

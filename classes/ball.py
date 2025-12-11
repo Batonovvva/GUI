@@ -28,6 +28,8 @@ class Ball:
     
     def draw(self, screen):
         x, y = int(self.pos[0]), int(self.pos[1])
+        pygame.draw.circle(screen, self.color, (x, y), self.radius)
+        pygame.draw.circle(screen, (255, 255, 255), (x, y), self.radius, 2)
         
         if self.type == 'normal':
             pygame.draw.circle(screen, self.color, (x, y), self.radius)

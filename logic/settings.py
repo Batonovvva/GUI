@@ -1,6 +1,16 @@
 import math
 import random
 
+class PowerUp:
+    TYPE_BURST_SHOOT = "burst_shoot"
+    TYPE_SLOW = "slow"
+    TYPE_FAST_SHOOT = "fast_shoot"
+    TYPE_REVERSE = "reverse"
+    TYPE_EXPLOSION = "explosion"
+
+POWERUP_DURATION = 6.0       # секунд действия замедления
+POWERUP_SLOW_FACTOR = 0.35
+
 #ПАРАМЕТРЫ ЭКРАНА
 WIDTH = 800
 HEIGHT = 600

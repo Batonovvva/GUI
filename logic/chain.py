@@ -4,7 +4,6 @@ from logic.spiral import *
 from classes.ball import Ball
 
 
-
 CHAIN_GAP_T = (BALL_DIAMETER + BALL_SPACING) / SPIRAL_TIGHTNESS
 SPIRAL_END_T = (SPIRAL_START_RADIUS - SPIRAL_END_RADIUS) / SPIRAL_TIGHTNESS
 

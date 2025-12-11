@@ -64,7 +64,7 @@ class Game:
                 mouse_pos = pygame.mouse.get_pos()
                 new_ball = self.frog.shoot(aim_pos=mouse_pos)
                 if new_ball:
-                    self.flying_balls.append(new_ball)
+                    self.flying_balls.extend(new_ball)
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -82,7 +82,7 @@ class Game:
                     elif event.key == pygame.K_SPACE:
                         new_ball = self.frog.shoot()
                         if new_ball:
-                            self.flying_balls.append(new_ball)
+                            self.flying_balls.extend(new_ball)
                     elif event.key == pygame.K_p:
                         self.state = "paused"
                 else:
@@ -113,7 +113,6 @@ class Game:
                 pass
 
         for ball in self.flying_balls[:]:
-            # Двигаем летящий шарик — поддерживаем обе реализации
             try:
                 ball.update(dt)
             except AttributeError:
@@ -133,6 +132,72 @@ class Game:
                 if getattr(target_stationary, "type", Ball.TYPE_NORMAL) == Ball.TYPE_SKULL:
                     self.state = "game_over"
                     return
+
+                target_stationary = self.level.chain[idx]
+                ball_type = getattr(target_stationary, "type", Ball.TYPE_NORMAL)
+
+                # Бонус замедления
+                if ball_type == PowerUp.TYPE_SLOW:
+                    self.level.activate_powerup(PowerUp.TYPE_SLOW)
+                    self.level.chain.pop(idx)  # удаляем бонусный шар
+                    self.score += 150           # очки за бонус
+                    if ball in self.flying_balls:
+                        self.flying_balls.remove(ball)
+                    continue
+
+                # reverse
+                elif ball_type == PowerUp.TYPE_REVERSE:
+                    self.level.activate_powerup(PowerUp.TYPE_REVERSE)
+                    self.level.chain.pop(idx)
+                    self.score += 150
+                    if ball in self.flying_balls:
+                        self.flying_balls.remove(ball)
+                    continue
+
+                # fast_shoot
+                elif ball_type == PowerUp.TYPE_FAST_SHOOT:
+                    self.level.activate_powerup(PowerUp.TYPE_FAST_SHOOT)
+                    self.frog.shoot_speed_multiplier = 1.5  # например, +50% скорость
+                    self.level.chain.pop(idx)
+                    self.score += 150
+                    if ball in self.flying_balls:
+                        self.flying_balls.remove(ball)
+                    continue
+
+                # burst_shoot
+                elif ball_type == PowerUp.TYPE_BURST_SHOOT:
+                    self.frog.burst_shoot_count = 3
+                    self.frog.burst_timer = POWERUP_DURATION
+                    self.level.chain.pop(idx)
+                    self.score += 150
+                    if ball in self.flying_balls:
+                        self.flying_balls.remove(ball)
+                    continue
+
+                # Проверяем таймер бонуса Burst Shoot
+                if hasattr(self.frog, "burst_timer") and self.frog.burst_timer > 0:
+                    self.frog.burst_timer -= dt
+                    if self.frog.burst_timer <= 0:
+                        self.frog.burst_shoot_count = 1
+
+
+                if ball_type == PowerUp.TYPE_EXPLOSION:
+                    self.level.activate_powerup(PowerUp.TYPE_EXPLOSION)
+
+                    idx_hit = idx
+                    explosion_radius = 3
+                    start_idx = max(0, idx_hit - explosion_radius)
+                    end_idx = min(len(self.level.chain) - 1, idx_hit + explosion_radius)
+                    indices_to_remove = list(range(start_idx, end_idx + 1))
+
+                    removed_count = remove_chain(self.level.chain, indices_to_remove)
+                    self.score += removed_count * _get_setting("POINTS_PER_BALL", 10)
+
+                    if ball in self.flying_balls:
+                        self.flying_balls.remove(ball)
+
+                    self.level.chain.pop(idx_hit)
+                    continue
 
                 # ===== если летящий шар сам — череп (bomb) =====
                 if getattr(ball, "type", Ball.TYPE_NORMAL) == Ball.TYPE_SKULL:

@@ -10,7 +10,7 @@ except Exception:
 from logic.chain import find_match, remove_chain, handle_skull, respace_chain
 from logic.collision import check_collision
 from logic.UI import draw_hud, draw_pause_menu, draw_level_complete, draw_game_over, draw_menu, draw_victory
-from logic.settings import *  # импортируем константы: LIVES, MAX_LEVEL, POINTS_PER_BALL, COMBO_MULTIPLIER, BALL_DIAMETER, BALL_SPACING, BALL_RADIUS, WIDTH, HEIGHT, BLACK
+from logic.settings import *
 
 # безопасный helper для значений из settings (если что-то не определено)
 def _get_setting(name: str, default):

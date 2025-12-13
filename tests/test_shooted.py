@@ -1,16 +1,10 @@
-﻿# tests/test_powerups.py
-import unittest
+﻿import unittest
 
 import pytest
 from classes.level import Level
 from logic.settings import PowerUp, POWERUP_DURATION, POWERUP_SLOW_FACTOR
 
-
 class DummyBall:
-    """
-    Заглушка вместо Ball: хранит последние переданные параметры update()
-    для удобной проверки в тестах.
-    """
     def __init__(self, t=0.0):
         self.t = t
         self.last_update_speed = None
